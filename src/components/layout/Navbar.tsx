@@ -4,8 +4,9 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Calendar, Flame, Trophy, Users, User, Zap, Gift } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
-import { CURRENT_USER } from '@/data/users';
+import { useStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
+import { Avatar } from '@/components/ui/Avatar';
 
 const NAV_ITEMS_DESKTOP = [
   { href: '/', label: 'Akce', icon: Calendar },
@@ -26,7 +27,14 @@ const NAV_ITEMS_MOBILE = [
 
 export function Navbar() {
   const pathname = usePathname();
-  if (pathname === '/onboarding') return null;
+  const profile = useStore((s) => s.profile);
+  const isOnboarded = useStore((s) => s.isOnboarded);
+
+  // Onboarding stránku schováme navbar
+  if (pathname === '/onboarding' || !isOnboarded || !profile) return null;
+
+  // Simulace streaku – na novém zařízení je 0; v reálu by se počítalo z checkin historie
+  const streak = 0;
 
   return (
     <>
@@ -66,22 +74,17 @@ export function Navbar() {
           </nav>
 
           <div className="flex items-center gap-3">
-            <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-flame-500/10 to-accent-500/10 border border-flame-500/20" title="Týdenní streak">
-              <Flame className="w-4 h-4 text-flame-500 flame-glow" />
-              <span className="text-sm font-bold">{CURRENT_USER.currentStreak}t</span>
-            </div>
+            {streak > 0 && (
+              <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-flame-500/10 to-accent-500/10 border border-flame-500/20" title="Týdenní streak">
+                <Flame className="w-4 h-4 text-flame-500 flame-glow" />
+                <span className="text-sm font-bold">{streak}t</span>
+              </div>
+            )}
 
             <ThemeToggle />
 
-            <Link href="/profile" className="relative">
-              <img
-                src={CURRENT_USER.avatarUrl}
-                alt={CURRENT_USER.name}
-                className="w-9 h-9 rounded-full border-2 border-border hover:border-brand-500 transition-colors"
-              />
-              <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 border-2 border-surface flex items-center justify-center text-[8px]">
-                🥈
-              </div>
+            <Link href="/profile" className="flex-shrink-0">
+              <Avatar name={profile.name} size="md" />
             </Link>
           </div>
         </div>
@@ -96,10 +99,12 @@ export function Navbar() {
             <span className="font-display font-bold">JBC Events</span>
           </Link>
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-flame-500/10 border border-flame-500/20" title="Týdenní streak">
-              <Flame className="w-3.5 h-3.5 text-flame-500" />
-              <span className="text-xs font-bold">{CURRENT_USER.currentStreak}t</span>
-            </div>
+            {streak > 0 && (
+              <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-flame-500/10 border border-flame-500/20" title="Týdenní streak">
+                <Flame className="w-3.5 h-3.5 text-flame-500" />
+                <span className="text-xs font-bold">{streak}t</span>
+              </div>
+            )}
             <ThemeToggle />
           </div>
         </div>

@@ -4,13 +4,13 @@ import { useEffect, useState } from 'react';
 import { notFound, useRouter } from 'next/navigation';
 import {
   ArrowLeft, Calendar, MapPin, Users, Heart, Zap, Trophy,
-  QrCode, Send, Share2, MessageCircle, UserPlus, Loader2, ExternalLink
+  QrCode, Send, Share2, MessageCircle, UserPlus, Loader2, ExternalLink,
 } from 'lucide-react';
 import { getEventById } from '@/data/events';
-import { MOCK_FRIENDS, CURRENT_USER } from '@/data/users';
 import { CATEGORY_LABELS } from '@/lib/types';
 import { formatDate, formatNumber, formatPrice, getRelativeTime, cn } from '@/lib/utils';
 import { useStore } from '@/lib/store';
+import { Avatar } from '@/components/ui/Avatar';
 
 interface Comment {
   id: string;
@@ -30,6 +30,7 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
   const [submittingComment, setSubmittingComment] = useState(false);
   const [commentError, setCommentError] = useState<string | null>(null);
 
+  const profile = useStore((s) => s.profile);
   const likes = useStore((s) => s.likes);
   const toggleLike = useStore((s) => s.toggleLike);
   const checkins = useStore((s) => s.checkins);
@@ -56,11 +57,11 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
   }, [event]);
 
   if (!event) return notFound();
+  if (!profile) return null;
 
   const cat = CATEGORY_LABELS[event.category];
   const isLiked = likes.has(event.id);
   const checkinStatus = checkins[event.id];
-  const attendingFriends = MOCK_FRIENDS.slice(0, 3);
 
   const handleCheckin = (status: 'going' | 'interested') => {
     if (checkinStatus === status) {
@@ -83,21 +84,28 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
     addPoints(event.basePoints);
     showToast({
       title: `🎉 +${event.basePoints} bodů!`,
-      body: 'Účast potvrzena. Týdenní streak prodloužen.',
+      body: 'Účast potvrzena.',
       icon: '✓',
     });
   };
 
   const handleSubmitComment = async () => {
     const content = commentInput.trim();
-    if (!content) return;
+    if (!content || !profile) return;
     setSubmittingComment(true);
     setCommentError(null);
     try {
       const res = await fetch(`/api/comments/${event.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content, userId: CURRENT_USER.id }),
+        body: JSON.stringify({
+          content,
+          user: {
+            id: profile.id,
+            name: profile.name,
+            username: profile.username,
+          },
+        }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -128,7 +136,12 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
 
         <div className="absolute top-3 left-3 md:top-4 md:left-4 flex gap-2 flex-wrap max-w-[calc(100%-120px)]">
-          <span className={cn('inline-flex items-center gap-1.5 px-2.5 md:px-3 py-1 rounded-full text-[11px] md:text-xs font-semibold text-white backdrop-blur-md bg-gradient-to-r', cat.color)}>
+          <span
+            className={cn(
+              'inline-flex items-center gap-1.5 px-2.5 md:px-3 py-1 rounded-full text-[11px] md:text-xs font-semibold text-white backdrop-blur-md bg-gradient-to-r',
+              cat.color
+            )}
+          >
             <span>{cat.emoji}</span> {cat.cs}
           </span>
           {event.sizeTier === 'mega' && (
@@ -141,8 +154,12 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
         <div className="absolute top-3 right-3 md:top-4 md:right-4 flex gap-2">
           <button
             onClick={() => toggleLike(event.id)}
-            className={cn('w-9 h-9 md:w-10 md:h-10 rounded-full backdrop-blur-md flex items-center justify-center transition-all',
-              isLiked ? 'bg-accent-500 text-white' : 'bg-white/20 text-white hover:bg-white/30')}
+            className={cn(
+              'w-9 h-9 md:w-10 md:h-10 rounded-full backdrop-blur-md flex items-center justify-center transition-all',
+              isLiked
+                ? 'bg-accent-500 text-white'
+                : 'bg-white/20 text-white hover:bg-white/30'
+            )}
           >
             <Heart className={cn('w-4 h-4 md:w-5 md:h-5', isLiked && 'fill-white')} />
           </button>
@@ -155,7 +172,9 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
           <div className="text-[10px] md:text-xs font-medium opacity-80 uppercase tracking-wider mb-1 md:mb-2">
             {getRelativeTime(event.startsAt)} · {formatDate(event.startsAt, { withTime: true })}
           </div>
-          <h1 className="text-xl md:text-4xl font-display font-bold leading-tight">{event.title}</h1>
+          <h1 className="text-xl md:text-4xl font-display font-bold leading-tight">
+            {event.title}
+          </h1>
         </div>
       </div>
 
@@ -164,7 +183,9 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
           <div className="flex items-center gap-1.5 text-[10px] md:text-xs text-ink-muted uppercase tracking-wider mb-1">
             <Calendar className="w-3 h-3 md:w-3.5 md:h-3.5" /> Datum
           </div>
-          <div className="font-semibold text-xs md:text-sm">{formatDate(event.startsAt, { short: true })}</div>
+          <div className="font-semibold text-xs md:text-sm">
+            {formatDate(event.startsAt, { short: true })}
+          </div>
         </div>
         <div className="card p-3 md:p-4">
           <div className="flex items-center gap-1.5 text-[10px] md:text-xs text-ink-muted uppercase tracking-wider mb-1">
@@ -176,10 +197,14 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
           <div className="flex items-center gap-1.5 text-[10px] md:text-xs text-ink-muted uppercase tracking-wider mb-1">
             <Zap className="w-3 h-3 md:w-3.5 md:h-3.5 text-brand-600" /> Odměna
           </div>
-          <div className="font-semibold text-xs md:text-sm text-brand-600">+{event.basePoints} b.</div>
+          <div className="font-semibold text-xs md:text-sm text-brand-600">
+            +{event.basePoints} b.
+          </div>
         </div>
         <div className="card p-3 md:p-4">
-          <div className="text-[10px] md:text-xs text-ink-muted uppercase tracking-wider mb-1">Cena</div>
+          <div className="text-[10px] md:text-xs text-ink-muted uppercase tracking-wider mb-1">
+            Cena
+          </div>
           <div className={cn('font-semibold text-xs md:text-sm', event.price === 0 && 'text-streak-600')}>
             {formatPrice(event.price)}
           </div>
@@ -191,9 +216,7 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
           onClick={() => handleCheckin('going')}
           className={cn(
             'justify-center',
-            checkinStatus === 'going'
-              ? 'btn-primary !bg-streak-500 hover:!bg-streak-600'
-              : 'btn-primary'
+            checkinStatus === 'going' ? 'btn-primary !bg-streak-500 hover:!bg-streak-600' : 'btn-primary'
           )}
         >
           {checkinStatus === 'going' ? '✓ Jdu' : 'Zúčastním se'}
@@ -254,30 +277,14 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-1 gap-3 md:gap-0 md:space-y-3">
             <div>
-              <div className="text-xl md:text-2xl font-display font-bold">{formatNumber(event.attendeeCount)}</div>
+              <div className="text-xl md:text-2xl font-display font-bold">
+                {formatNumber(event.attendeeCount)}
+              </div>
               <div className="text-xs text-ink-muted">lidí jde</div>
             </div>
             <div>
               <div className="text-lg font-semibold">{formatNumber(event.interestedCount)}</div>
               <div className="text-xs text-ink-muted">má zájem</div>
-            </div>
-          </div>
-
-          <div className="mt-4 pt-4 border-t border-border">
-            <div className="text-xs text-ink-muted mb-2">Z tvých přátel jdou:</div>
-            <div className="flex items-center gap-2">
-              <div className="flex -space-x-2">
-                {attendingFriends.map((f) => (
-                  <img
-                    key={f.id}
-                    src={f.avatarUrl}
-                    alt={f.name}
-                    className="w-7 h-7 md:w-8 md:h-8 rounded-full border-2 border-surface-elevated"
-                    title={f.name}
-                  />
-                ))}
-              </div>
-              <span className="text-sm font-medium">+{attendingFriends.length}</span>
             </div>
           </div>
         </div>
@@ -300,13 +307,12 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
           ) : (
             comments.map((c) => (
               <div key={c.id} className="flex gap-3">
-                <img
-                  src={c.user.avatarUrl || 'https://i.pravatar.cc/200?img=1'}
-                  alt={c.user.name}
-                  className="w-9 h-9 md:w-10 md:h-10 rounded-full flex-shrink-0"
-                />
+                <Avatar name={c.user.name} size="md" />
                 <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-sm">{c.user.name}</div>
+                  <div className="flex items-baseline gap-2 flex-wrap">
+                    <div className="font-semibold text-sm">{c.user.name}</div>
+                    <div className="text-xs text-ink-subtle">@{c.user.username}</div>
+                  </div>
                   <div className="text-sm mt-1 leading-relaxed break-words">{c.content}</div>
                   <div className="flex items-center gap-3 mt-1 text-xs text-ink-muted">
                     <span>{getRelativeTime(c.createdAt)}</span>
@@ -323,10 +329,11 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
           </div>
         )}
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-start">
+          <Avatar name={profile.name} size="md" className="mt-1 hidden sm:flex" />
           <input
             type="text"
-            placeholder="Napiš komentář..."
+            placeholder={`Komentář jako ${profile.name.split(' ')[0]}...`}
             className="input flex-1"
             value={commentInput}
             onChange={(e) => setCommentInput(e.target.value)}
@@ -347,8 +354,14 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
       </section>
 
       {showQR && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowQR(false)}>
-          <div className="bg-surface-elevated rounded-3xl p-6 md:p-8 max-w-sm w-full text-center" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setShowQR(false)}
+        >
+          <div
+            className="bg-surface-elevated rounded-3xl p-6 md:p-8 max-w-sm w-full text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="w-36 h-36 md:w-48 md:h-48 mx-auto bg-gradient-to-br from-brand-500 to-accent-500 rounded-2xl flex items-center justify-center mb-4">
               <QrCode className="w-20 h-20 md:w-24 md:h-24 text-white" />
             </div>

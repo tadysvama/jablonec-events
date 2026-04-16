@@ -2,25 +2,41 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { CheckinStatus } from './types';
+import { CheckinStatus, EventCategory } from './types';
+
+// Profil uživatele stažený na tomto zařízení
+export interface LocalUserProfile {
+  id: string; // persistentní ID tohoto zařízení
+  name: string;
+  username: string;
+  ageGroup: string; // "15-17" | "18-25" | "26-35" | "36-45" | "46-60" | "60+"
+  gender: string; // "female" | "male" | "other" | "prefer_not_to_say"
+  city: string;
+  interests: EventCategory[]; // max 3
+  createdAt: string;
+}
 
 interface UserStore {
+  // Onboarding
   isOnboarded: boolean;
-  setOnboarded: (val: boolean) => void;
+  profile: LocalUserProfile | null;
+  completeOnboarding: (profile: Omit<LocalUserProfile, 'id' | 'createdAt'>) => void;
 
+  // Akce
   checkins: Record<string, CheckinStatus>;
   setCheckin: (eventId: string, status: CheckinStatus) => void;
   removeCheckin: (eventId: string) => void;
 
+  // Lajky
   likes: Set<string>;
   toggleLike: (eventId: string) => void;
 
-  // Body
+  // Body (naběháno na tomto zařízení)
   earnedPoints: number;
   addPoints: (p: number) => void;
-  spendPoints: (p: number) => boolean; // vrací true pokud úspěch
+  spendPoints: (p: number) => boolean;
 
-  // Vyzvednuté odměny – persistuje mezi sessions
+  // Odměny
   claimedRewards: Set<string>;
   claimReward: (rewardId: string, cost: number) => boolean;
 
@@ -32,11 +48,29 @@ interface UserStore {
   reset: () => void;
 }
 
+// Pomocná funkce pro generování unikátního ID zařízení
+function generateDeviceId(): string {
+  return (
+    'usr_' +
+    Math.random().toString(36).substring(2, 11) +
+    Date.now().toString(36)
+  );
+}
+
 export const useStore = create<UserStore>()(
   persist(
     (set, get) => ({
       isOnboarded: false,
-      setOnboarded: (val) => set({ isOnboarded: val }),
+      profile: null,
+      completeOnboarding: (data) => {
+        const existing = get().profile;
+        const profile: LocalUserProfile = {
+          id: existing?.id ?? generateDeviceId(),
+          createdAt: existing?.createdAt ?? new Date().toISOString(),
+          ...data,
+        };
+        set({ profile, isOnboarded: true });
+      },
 
       checkins: {},
       setCheckin: (eventId, status) =>
@@ -60,10 +94,7 @@ export const useStore = create<UserStore>()(
       earnedPoints: 0,
       addPoints: (p) => set((s) => ({ earnedPoints: s.earnedPoints + p })),
       spendPoints: (p) => {
-        const current = get().earnedPoints;
-        // earnedPoints může být klidně záporný – reprezentuje "změnu oproti baseline"
-        // Skutečná kontrola dostupnosti probíhá v komponentě, která zná totalPoints.
-        set({ earnedPoints: current - p });
+        set((s) => ({ earnedPoints: s.earnedPoints - p }));
         return true;
       },
 
@@ -88,6 +119,7 @@ export const useStore = create<UserStore>()(
       reset: () =>
         set({
           isOnboarded: false,
+          profile: null,
           checkins: {},
           likes: new Set(),
           earnedPoints: 0,
@@ -99,6 +131,7 @@ export const useStore = create<UserStore>()(
       partialize: (state) =>
         ({
           isOnboarded: state.isOnboarded,
+          profile: state.profile,
           checkins: state.checkins,
           likes: Array.from(state.likes),
           earnedPoints: state.earnedPoints,

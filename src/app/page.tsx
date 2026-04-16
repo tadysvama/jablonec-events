@@ -3,8 +3,7 @@
 import { useMemo, useState } from 'react';
 import { Search, Zap, Flame, TrendingUp } from 'lucide-react';
 import { MOCK_EVENTS, filterEvents } from '@/data/events';
-import { CURRENT_USER } from '@/data/users';
-import { CATEGORY_LABELS, EventCategory } from '@/lib/types';
+import { CATEGORY_LABELS, EventCategory, User } from '@/lib/types';
 import { EventCard } from '@/components/events/EventCard';
 import { recommendEvents } from '@/lib/utils';
 import { cn } from '@/lib/utils';
@@ -13,48 +12,69 @@ import { useStore } from '@/lib/store';
 type SortBy = 'recommended' | 'date' | 'popularity' | 'points';
 
 export default function HomePage() {
+  const profile = useStore((s) => s.profile);
+  const earnedPoints = useStore((s) => s.earnedPoints);
   const [category, setCategory] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<SortBy>('recommended');
-  const earnedPoints = useStore((s) => s.earnedPoints);
-  const totalPoints = CURRENT_USER.totalPoints + earnedPoints;
 
   const events = useMemo(() => {
-    if (sortBy === 'recommended') {
-      const recommended = recommendEvents(MOCK_EVENTS, CURRENT_USER, ['concert', 'concert', 'sport', 'festival']);
+    if (sortBy === 'recommended' && profile) {
+      // Pseudo-user pro doporučovací algoritmus
+      const pseudoUser: User = {
+        id: profile.id,
+        username: profile.username,
+        name: profile.name,
+        avatarUrl: '',
+        interests: profile.interests,
+        privacyMode: 'friends',
+        totalPoints: 0,
+        currentStreak: 0,
+        longestStreak: 0,
+        streakFreezes: 2,
+        currentLeague: 'bronze',
+        leaguePoints: 0,
+        createdAt: profile.createdAt,
+        stats: { eventsAttended: 0, badgesEarned: 0, friendsCount: 0, venuesVisited: 0 },
+      };
+      const recommended = recommendEvents(MOCK_EVENTS, pseudoUser, profile.interests);
       return filterEvents(recommended, { category, search });
     }
-    return filterEvents(MOCK_EVENTS, { category, search, sortBy: sortBy as 'date' | 'popularity' | 'points' });
-  }, [category, search, sortBy]);
+    return filterEvents(MOCK_EVENTS, {
+      category,
+      search,
+      sortBy: sortBy === 'recommended' ? 'date' : (sortBy as 'date' | 'popularity' | 'points'),
+    });
+  }, [category, search, sortBy, profile]);
 
   const featured = events[0];
   const rest = events.slice(1);
 
+  if (!profile) return null; // OnboardingGate přesměruje
+
   return (
     <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-6 pb-28 md:pb-10">
-      {/* Hero – kompaktnější na mobilu */}
       <section className="mb-5 md:mb-8">
         <div className="relative overflow-hidden rounded-2xl md:rounded-3xl bg-gradient-to-br from-brand-600 via-brand-500 to-accent-500 p-5 md:p-8 text-white shadow-xl shadow-brand-500/20">
           <div className="absolute top-0 right-0 w-48 md:w-64 h-48 md:h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
           <div className="relative grid md:grid-cols-[1fr,auto] gap-4 md:gap-6 items-center">
             <div>
               <div className="text-xs md:text-sm font-medium opacity-90 mb-1 md:mb-2">
-                Ahoj, {CURRENT_USER.name.split(' ')[0]} 👋
+                Ahoj, {profile.name.split(' ')[0]} 👋
               </div>
               <h1 className="text-2xl md:text-4xl font-display font-bold mb-3 leading-tight">
                 Co se děje v Jablonci
               </h1>
               <div className="flex flex-wrap items-center gap-1.5 md:gap-3 text-xs md:text-sm">
                 <div className="flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1 md:py-1.5 rounded-full bg-white/20 backdrop-blur-sm">
-                  <Flame className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                  <span className="font-semibold">{CURRENT_USER.currentStreak} týdnů</span>
-                </div>
-                <div className="flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1 md:py-1.5 rounded-full bg-white/20 backdrop-blur-sm">
                   <Zap className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                  <span className="font-semibold">{totalPoints.toLocaleString('cs-CZ')} b.</span>
+                  <span className="font-semibold">
+                    {earnedPoints.toLocaleString('cs-CZ')} b.
+                  </span>
                 </div>
                 <div className="hidden sm:flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1 md:py-1.5 rounded-full bg-white/20 backdrop-blur-sm">
-                  🥈 <span className="font-semibold">Stříbrná · 5.</span>
+                  <Flame className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                  <span className="font-semibold">0 týdnů · začátečník</span>
                 </div>
               </div>
             </div>
@@ -63,7 +83,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Search & filtry */}
       <section className="mb-5 md:mb-6">
         <div className="relative mb-3 md:mb-4">
           <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-ink-subtle" />
@@ -78,14 +97,19 @@ export default function HomePage() {
 
         <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0">
           {(['all', ...Object.keys(CATEGORY_LABELS)] as const).map((cat) => {
-            const meta = cat === 'all' ? { cs: 'Vše', emoji: '✨' } : CATEGORY_LABELS[cat as EventCategory];
+            const meta =
+              cat === 'all'
+                ? { cs: 'Vše', emoji: '✨' }
+                : CATEGORY_LABELS[cat as EventCategory];
             const active = category === cat;
+            const isMyInterest =
+              cat !== 'all' && profile.interests.includes(cat as EventCategory);
             return (
               <button
                 key={cat}
                 onClick={() => setCategory(cat)}
                 className={cn(
-                  'flex items-center gap-1.5 px-3 md:px-4 py-2 rounded-full border text-xs md:text-sm font-medium whitespace-nowrap transition-all flex-shrink-0',
+                  'flex items-center gap-1.5 px-3 md:px-4 py-2 rounded-full border text-xs md:text-sm font-medium whitespace-nowrap transition-all flex-shrink-0 relative',
                   active
                     ? 'bg-ink text-surface border-ink'
                     : 'bg-surface-elevated border-border hover:border-brand-400 text-ink-muted'
@@ -93,6 +117,9 @@ export default function HomePage() {
               >
                 <span>{meta.emoji}</span>
                 {meta.cs}
+                {isMyInterest && !active && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand-500" title="Tvůj zájem" />
+                )}
               </button>
             );
           })}

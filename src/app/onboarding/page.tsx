@@ -2,24 +2,24 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, ArrowRight, Check, Mail } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Sparkles } from 'lucide-react';
 import { CATEGORY_LABELS, EventCategory } from '@/lib/types';
 import { useStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
+import { Avatar } from '@/components/ui/Avatar';
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const setOnboarded = useStore((s) => s.setOnboarded);
+  const completeOnboarding = useStore((s) => s.completeOnboarding);
+
   const [step, setStep] = useState(1);
   const [data, setData] = useState({
     name: '',
     username: '',
-    email: '',
     ageGroup: '',
     gender: '',
     city: 'Jablonec nad Nisou',
     interests: [] as EventCategory[],
-    notifications: true,
   });
 
   const totalSteps = 4;
@@ -35,30 +35,47 @@ export default function OnboardingPage() {
   };
 
   const next = () => {
-    if (step < totalSteps) setStep(step + 1);
-    else {
-      setOnboarded(true);
-      router.push('/');
+    if (step < totalSteps) {
+      setStep(step + 1);
+    } else {
+      // Ulož do store a přesměruj
+      completeOnboarding({
+        name: data.name.trim(),
+        username: data.username.trim().toLowerCase(),
+        ageGroup: data.ageGroup,
+        gender: data.gender,
+        city: data.city.trim(),
+        interests: data.interests,
+      });
+      router.replace('/');
     }
+  };
+
+  const back = () => {
+    if (step > 1) setStep(step - 1);
   };
 
   const canProceed = () => {
     switch (step) {
-      case 1: return true;
-      case 2: return data.name.trim() && data.username.trim();
-      case 3: return data.interests.length === 3;
-      case 4: return true;
-      default: return false;
+      case 1:
+        return data.name.trim().length >= 2 && data.username.trim().length >= 2;
+      case 2:
+        return !!data.ageGroup && !!data.gender;
+      case 3:
+        return data.interests.length === 3;
+      case 4:
+        return true;
+      default:
+        return false;
     }
   };
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-brand-50 via-surface to-accent-50 dark:from-brand-950 dark:via-surface dark:to-accent-950/30">
-      {/* Progress bar */}
-      <div className="px-4 pt-6 md:px-8">
+      <div className="px-4 pt-5 md:pt-6 md:px-8">
         <div className="flex items-center justify-between max-w-md mx-auto w-full">
           <button
-            onClick={() => step > 1 && setStep(step - 1)}
+            onClick={back}
             className={cn('btn-ghost', step === 1 && 'invisible')}
           >
             <ArrowLeft className="w-4 h-4" /> Zpět
@@ -76,114 +93,172 @@ export default function OnboardingPage() {
         </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 flex items-center justify-center px-4 py-8">
+      <div className="flex-1 flex items-center justify-center px-4 py-6 md:py-8">
         <div className="w-full max-w-md">
+          {/* Krok 1: Jméno + uživatelské jméno */}
           {step === 1 && (
             <div className="animate-slide-up">
-              <div className="text-center mb-8">
-                <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-brand-500 to-accent-500 flex items-center justify-center shadow-xl shadow-brand-500/30">
-                  <span className="text-white text-4xl font-display font-bold">J</span>
+              <div className="text-center mb-6 md:mb-8">
+                <div className="w-16 h-16 md:w-20 md:h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-brand-500 to-accent-500 flex items-center justify-center shadow-xl shadow-brand-500/30">
+                  <span className="text-white text-3xl md:text-4xl font-display font-bold">J</span>
                 </div>
-                <h1 className="font-display text-3xl font-bold mb-2">Vítej v JBC Events</h1>
-                <p className="text-ink-muted">
-                  Objevuj kulturní a sportovní akce v Jablonci, sbírej body a buduj streak s kamarády.
+                <h1 className="font-display text-2xl md:text-3xl font-bold mb-2">
+                  Vítej v JBC Events
+                </h1>
+                <p className="text-sm md:text-base text-ink-muted">
+                  Objevuj kulturní a sportovní akce v Jablonci. Jak se jmenuješ?
                 </p>
               </div>
 
               <div className="space-y-3">
-                <button className="btn-secondary w-full justify-center py-3" onClick={next}>
-                  <span className="text-base">🔵</span> Pokračovat s Google
-                </button>
-                <button className="btn-secondary w-full justify-center py-3" onClick={next}>
-                  <span className="text-base"></span> Pokračovat s Apple
-                </button>
-                <div className="flex items-center gap-3 py-2">
-                  <div className="flex-1 h-px bg-border" />
-                  <span className="text-xs text-ink-muted">nebo</span>
-                  <div className="flex-1 h-px bg-border" />
+                <div>
+                  <label className="block text-xs font-medium text-ink-muted mb-1.5 uppercase tracking-wider">
+                    Tvé jméno
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Např. Tereza Nováková"
+                    className="input"
+                    value={data.name}
+                    onChange={(e) => setData({ ...data, name: e.target.value })}
+                    autoFocus
+                  />
                 </div>
-                <input
-                  type="email"
-                  placeholder="tvůj@email.cz"
-                  className="input"
-                  value={data.email}
-                  onChange={(e) => setData({ ...data, email: e.target.value })}
-                />
-                <input type="password" placeholder="Heslo" className="input" />
+
+                <div>
+                  <label className="block text-xs font-medium text-ink-muted mb-1.5 uppercase tracking-wider">
+                    Uživatelské jméno
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-subtle">@</span>
+                    <input
+                      type="text"
+                      placeholder="tereza_jbc"
+                      className="input pl-8"
+                      value={data.username}
+                      onChange={(e) =>
+                        setData({
+                          ...data,
+                          username: e.target.value.replace(/[^a-zA-Z0-9_.]/g, ''),
+                        })
+                      }
+                    />
+                  </div>
+                  <p className="text-xs text-ink-subtle mt-1.5">
+                    Zobrazí se u tvých komentářů. Jen písmena, čísla, tečka a podtržítko.
+                  </p>
+                </div>
+
+                {/* Live preview iniciál */}
+                {data.name.trim().length >= 2 && (
+                  <div className="card p-4 flex items-center gap-3 mt-4 animate-fade-in">
+                    <Avatar name={data.name} size="lg" />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold truncate">{data.name}</div>
+                      {data.username && (
+                        <div className="text-xs text-ink-muted truncate">@{data.username}</div>
+                      )}
+                    </div>
+                    <span className="text-xs text-ink-subtle">náhled</span>
+                  </div>
+                )}
               </div>
             </div>
           )}
 
+          {/* Krok 2: Věk + pohlaví */}
           {step === 2 && (
             <div className="animate-slide-up">
-              <h2 className="font-display text-2xl font-bold mb-2 text-center">Řekni nám o sobě</h2>
-              <p className="text-ink-muted text-center mb-6 text-sm">
-                Tyhle údaje pomáhají s doporučováním akcí a komunitou.
+              <h2 className="font-display text-xl md:text-2xl font-bold mb-2 text-center">
+                Pár údajů o tobě
+              </h2>
+              <p className="text-ink-muted text-center mb-5 md:mb-6 text-sm">
+                Pomůže to s přesnějším doporučováním akcí. Nikdo je veřejně neuvidí.
               </p>
 
-              <div className="space-y-3">
-                <input
-                  type="text"
-                  placeholder="Jméno a příjmení"
-                  className="input"
-                  value={data.name}
-                  onChange={(e) => setData({ ...data, name: e.target.value })}
-                />
-                <input
-                  type="text"
-                  placeholder="Uživatelské jméno (@username)"
-                  className="input"
-                  value={data.username}
-                  onChange={(e) => setData({ ...data, username: e.target.value })}
-                />
-
-                <div className="grid grid-cols-2 gap-3">
-                  <select
-                    className="input"
-                    value={data.ageGroup}
-                    onChange={(e) => setData({ ...data, ageGroup: e.target.value })}
-                  >
-                    <option value="">Věková skupina</option>
-                    <option value="15-17">15–17</option>
-                    <option value="18-25">18–25</option>
-                    <option value="26-35">26–35</option>
-                    <option value="36-45">36–45</option>
-                    <option value="46-60">46–60</option>
-                    <option value="60+">60+</option>
-                  </select>
-                  <select
-                    className="input"
-                    value={data.gender}
-                    onChange={(e) => setData({ ...data, gender: e.target.value })}
-                  >
-                    <option value="">Pohlaví</option>
-                    <option value="female">Žena</option>
-                    <option value="male">Muž</option>
-                    <option value="other">Jiné</option>
-                    <option value="prefer_not_to_say">Neuvádím</option>
-                  </select>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-ink-muted mb-2 uppercase tracking-wider">
+                    Věková skupina
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {['15-17', '18-25', '26-35', '36-45', '46-60', '60+'].map((age) => {
+                      const active = data.ageGroup === age;
+                      return (
+                        <button
+                          key={age}
+                          onClick={() => setData({ ...data, ageGroup: age })}
+                          className={cn(
+                            'p-3 rounded-xl border-2 transition-all text-sm font-semibold',
+                            active
+                              ? 'border-brand-500 bg-brand-50 dark:bg-brand-950 text-brand-700 dark:text-brand-300'
+                              : 'border-border bg-surface-elevated hover:border-brand-300'
+                          )}
+                        >
+                          {age}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                <input
-                  type="text"
-                  placeholder="Bydliště"
-                  className="input"
-                  value={data.city}
-                  onChange={(e) => setData({ ...data, city: e.target.value })}
-                />
+                <div>
+                  <label className="block text-xs font-medium text-ink-muted mb-2 uppercase tracking-wider">
+                    Pohlaví
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { id: 'female', label: 'Žena' },
+                      { id: 'male', label: 'Muž' },
+                      { id: 'other', label: 'Jiné' },
+                      { id: 'prefer_not_to_say', label: 'Neuvádím' },
+                    ].map((g) => {
+                      const active = data.gender === g.id;
+                      return (
+                        <button
+                          key={g.id}
+                          onClick={() => setData({ ...data, gender: g.id })}
+                          className={cn(
+                            'p-3 rounded-xl border-2 transition-all text-sm font-semibold',
+                            active
+                              ? 'border-brand-500 bg-brand-50 dark:bg-brand-950 text-brand-700 dark:text-brand-300'
+                              : 'border-border bg-surface-elevated hover:border-brand-300'
+                          )}
+                        >
+                          {g.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-ink-muted mb-1.5 uppercase tracking-wider">
+                    Bydliště
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Město"
+                    className="input"
+                    value={data.city}
+                    onChange={(e) => setData({ ...data, city: e.target.value })}
+                  />
+                </div>
               </div>
             </div>
           )}
 
+          {/* Krok 3: Zájmy */}
           {step === 3 && (
             <div className="animate-slide-up">
-              <h2 className="font-display text-2xl font-bold mb-2 text-center">Co tě zajímá?</h2>
-              <p className="text-ink-muted text-center mb-6 text-sm">
-                Vyber <strong>3 oblasti</strong>, o kterých chceš hlavně vědět. Později můžeš měnit.
+              <h2 className="font-display text-xl md:text-2xl font-bold mb-2 text-center">
+                Co tě zajímá?
+              </h2>
+              <p className="text-ink-muted text-center mb-5 md:mb-6 text-sm">
+                Vyber <strong>3 oblasti</strong>, o kterých chceš hlavně vědět.
               </p>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2 md:gap-3">
                 {Object.entries(CATEGORY_LABELS).map(([cat, meta]) => {
                   const selected = data.interests.includes(cat as EventCategory);
                   const disabled = !selected && data.interests.length >= 3;
@@ -193,14 +268,14 @@ export default function OnboardingPage() {
                       disabled={disabled}
                       onClick={() => toggleInterest(cat as EventCategory)}
                       className={cn(
-                        'p-4 rounded-2xl border-2 transition-all text-left',
+                        'p-3 md:p-4 rounded-2xl border-2 transition-all text-left',
                         selected
                           ? 'border-brand-500 bg-brand-50 dark:bg-brand-950'
                           : 'border-border bg-surface-elevated hover:border-brand-300',
                         disabled && 'opacity-40 cursor-not-allowed'
                       )}
                     >
-                      <div className="text-2xl mb-1">{meta.emoji}</div>
+                      <div className="text-xl md:text-2xl mb-1">{meta.emoji}</div>
                       <div className="font-semibold text-sm">{meta.cs}</div>
                       {selected && (
                         <div className="mt-1 inline-flex items-center gap-1 text-xs text-brand-600 dark:text-brand-400 font-medium">
@@ -218,69 +293,80 @@ export default function OnboardingPage() {
             </div>
           )}
 
+          {/* Krok 4: Hotovo */}
           {step === 4 && (
             <div className="animate-slide-up">
               <div className="text-center mb-6">
-                <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-streak-100 dark:bg-streak-500/20 flex items-center justify-center">
-                  <Check className="w-10 h-10 text-streak-600" />
+                <div className="relative w-24 h-24 mx-auto mb-4">
+                  <Avatar name={data.name} size="2xl" className="w-24 h-24 text-3xl" />
+                  <div className="absolute -top-2 -right-2">
+                    <Sparkles className="w-8 h-8 text-accent-500 animate-pulse-soft" />
+                  </div>
                 </div>
-                <h2 className="font-display text-2xl font-bold mb-2">Všechno připraveno!</h2>
+                <h2 className="font-display text-xl md:text-2xl font-bold mb-1">
+                  Vše je připravené, {data.name.split(' ')[0]}!
+                </h2>
                 <p className="text-ink-muted text-sm">
-                  Ještě pár drobností a pak objevuješ Jablonec jinak.
+                  Tvůj profil je vytvořený jen na tomto zařízení. Zkontroluj a začni objevovat.
                 </p>
               </div>
 
-              <div className="card p-4 mb-3">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-brand-100 dark:bg-brand-950 flex items-center justify-center flex-shrink-0">
-                    <Mail className="w-5 h-5 text-brand-600 dark:text-brand-400" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="font-semibold text-sm mb-1">Upozornění na akce</div>
-                    <p className="text-xs text-ink-muted leading-relaxed">
-                      Pošleme ti novinky z tvých kategorií a připomenem streak, abys nic nepromeškal(a).
-                    </p>
-                    <label className="flex items-center gap-2 mt-2 text-xs cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={data.notifications}
-                        onChange={(e) => setData({ ...data, notifications: e.target.checked })}
-                        className="w-4 h-4 rounded accent-brand-600"
-                      />
-                      Zapnout upozornění
-                    </label>
-                  </div>
-                </div>
+              <div className="card p-4 space-y-3">
+                <Row label="Jméno" value={data.name} />
+                <Row label="Username" value={`@${data.username}`} />
+                <Row label="Věk" value={data.ageGroup} />
+                <Row label="Pohlaví" value={formatGender(data.gender)} />
+                <Row label="Bydliště" value={data.city} />
+                <Row
+                  label="Zájmy"
+                  value={data.interests
+                    .map((c) => CATEGORY_LABELS[c].emoji + ' ' + CATEGORY_LABELS[c].cs)
+                    .join(', ')}
+                />
               </div>
 
-              <div className="card p-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-accent-100 dark:bg-accent-500/10 flex items-center justify-center flex-shrink-0">
-                    🔐
-                  </div>
-                  <div className="flex-1">
-                    <div className="font-semibold text-sm mb-1">Soukromí</div>
-                    <p className="text-xs text-ink-muted leading-relaxed">
-                      Profil uvidí jen přátelé. V nastavení můžeš kdykoliv přepnout.
-                    </p>
-                  </div>
-                </div>
-              </div>
+              <p className="text-xs text-ink-subtle text-center mt-4">
+                Data ukládáme jen do tohoto prohlížeče. Žádný server si je nepamatuje.
+              </p>
             </div>
           )}
 
-          {/* Next button */}
           <button
             onClick={next}
             disabled={!canProceed()}
-            className="btn-primary w-full justify-center py-3 mt-8 disabled:opacity-40"
+            className="btn-primary w-full justify-center py-3 mt-6 md:mt-8 disabled:opacity-40"
           >
-            {step === totalSteps ? 'Začít objevovat ✨' : (
-              <>Pokračovat <ArrowRight className="w-4 h-4" /></>
+            {step === totalSteps ? (
+              <>
+                Začít objevovat <Sparkles className="w-4 h-4" />
+              </>
+            ) : (
+              <>
+                Pokračovat <ArrowRight className="w-4 h-4" />
+              </>
             )}
           </button>
         </div>
       </div>
     </div>
   );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-3 text-sm">
+      <span className="text-ink-muted flex-shrink-0">{label}</span>
+      <span className="font-medium text-right">{value}</span>
+    </div>
+  );
+}
+
+function formatGender(g: string): string {
+  const map: Record<string, string> = {
+    female: 'Žena',
+    male: 'Muž',
+    other: 'Jiné',
+    prefer_not_to_say: 'Neuvádím',
+  };
+  return map[g] || g;
 }

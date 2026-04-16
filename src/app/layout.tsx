@@ -3,8 +3,8 @@ import { Manrope, Fraunces } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '@/components/layout/ThemeProvider';
 import { Navbar } from '@/components/layout/Navbar';
+import { OnboardingGate } from '@/components/layout/OnboardingGate';
 
-// Vybrané fonty: Fraunces (distinctive serif pro displeje) + Manrope (čistý sans pro text)
 const manrope = Manrope({
   subsets: ['latin', 'latin-ext'],
   variable: '--font-sans',
@@ -38,10 +38,12 @@ export default function RootLayout({
     <html lang="cs" className={`${manrope.variable} ${fraunces.variable}`} suppressHydrationWarning>
       <body>
         <ThemeProvider>
-          <div className="min-h-screen flex flex-col">
-            <Navbar />
-            <main className="flex-1">{children}</main>
-          </div>
+          <OnboardingGate>
+            <div className="min-h-screen flex flex-col">
+              <Navbar />
+              <main className="flex-1">{children}</main>
+            </div>
+          </OnboardingGate>
         </ThemeProvider>
       </body>
     </html>

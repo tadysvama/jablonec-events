@@ -1,180 +1,86 @@
-# ⚡ Quick Start – co udělat po stažení patche
+# 🎯 Patch v4 – Per-device profily + onboarding
 
-Tenhle patch **přepíná aplikaci ze SQLite na PostgreSQL** a přidává spoustu
-oprav. Je to větší změna než předchozí patche, tak čti pozorně.
+## Co tento patch dělá
 
----
+1. ✅ **Onboarding při první návštěvě** – každé zařízení projde 4-krokový setup
+2. ✅ **Per-device profil** – data uložená v localStorage prohlížeče
+3. ✅ **Iniciály místo obrázků** – konzistentní barvy podle hash jména
+4. ✅ **Odstranění Terezy** jako default usera – nový návštěvník začíná čistě
+5. ✅ **Komentáře s reálnými jmény** – každé zařízení má jiného autora
+6. ✅ **Edit profilu** – klikem v profilu znovu projít onboardingem
 
-## 🎯 Co tenhle patch dělá
+## Co se s čím děje
 
-1. ✅ Opravuje **odečítání bodů** u odměn (klik "Získat" teď vážně sníží zůstatek)
-2. ✅ Komentáře se **ukládají do databáze** (ne jen do prohlížeče) – po deploy
-   je uvidí všichni uživatelé
-3. ✅ Streak se počítá **po týdnech**, ne po dnech
-4. ✅ **Historie** v profilu seřazená od nejnovější, s roky u dat
-5. ✅ **Mobilní rozhraní** optimalizované – menší paddingy, adaptivní grid,
-   safe-area padding pro iPhone home indicator
-6. ✅ Připravené na **deploy na Render** (detailní návod v DEPLOY.md)
+- **1. návštěva:** dostaneš onboarding → vyplníš jméno + věk + pohlaví + 3 zájmy → uloží se do prohlížeče → pustí tě na feed
+- **Další návštěvy na stejném zařízení:** onboarding přeskočen, jdeš rovnou do appky
+- **Jiný prohlížeč / zařízení:** onboarding znovu (jiný profil)
+- **Smazání dat:** v profilu → Nastavení → "Smazat profil a odhlásit"
 
----
-
-## 📦 Soubory v patchi (13 kusů)
+## Soubory v patchi
 
 ```
-jbc-patch-v3/
-├── .env.example              # Šablona pro DATABASE_URL
-├── DEPLOY.md                 # Návod na deploy na Render (10 min)
-├── package.json              # Aktualizovaný s build skriptem
-├── prisma/
-│   ├── schema.prisma         # PŘEPSAT – teď je to Postgres, ne SQLite
-│   └── seed.ts               # PŘEPSAT – se seed komentáři
+jbc-patch-v4/
 └── src/
     ├── app/
-    │   ├── globals.css       # PŘEPSAT – mobilní safe-area, lepší responzivita
-    │   ├── page.tsx          # PŘEPSAT – homepage optimalizovaná pro mobil
-    │   ├── api/
-    │   │   └── comments/
-    │   │       └── [eventId]/
-    │   │           └── route.ts        # NOVÝ – API endpoint pro komentáře
-    │   ├── events/
-    │   │   └── [id]/
-    │   │       └── page.tsx            # PŘEPSAT – real komentáře přes fetch()
-    │   ├── profile/
-    │   │   └── page.tsx                # PŘEPSAT – historie s roky + týdny
-    │   └── rewards/
-    │       └── page.tsx                # PŘEPSAT – odečítání bodů funguje
+    │   ├── layout.tsx                           # PŘEPSAT – přidá OnboardingGate
+    │   ├── page.tsx                             # PŘEPSAT – čte profile ze store
+    │   ├── onboarding/page.tsx                  # PŘEPSAT – ukládá do store
+    │   ├── profile/page.tsx                     # PŘEPSAT – zobrazuje store data
+    │   ├── events/[id]/page.tsx                 # PŘEPSAT – Avatary u komentářů
+    │   └── api/comments/[eventId]/route.ts      # PŘEPSAT – přijímá user data
     ├── components/
-    │   ├── events/
-    │   │   └── EventCard.tsx           # PŘEPSAT – mobil optimalizace
+    │   ├── ui/Avatar.tsx                        # NOVÝ – iniciály + hash barva
     │   └── layout/
-    │       └── Navbar.tsx              # PŘEPSAT – "12t" místo "12"
-    ├── data/
-    │   └── users.ts                    # PŘEPSAT – streak v týdnech
-    └── lib/
-        ├── prisma.ts                   # NOVÝ – Prisma singleton client
-        └── store.ts                    # PŘEPSAT – spendPoints + claimReward
+    │       ├── Navbar.tsx                       # PŘEPSAT – čte store + Avatar
+    │       └── OnboardingGate.tsx               # NOVÝ – redirect logic
+    └── lib/store.ts                             # PŘEPSAT – přidá profile
 ```
 
----
+## Jak to aplikovat
 
-## 🚀 KROK 1: Aplikuj patch (2 minuty)
+### 1. Rozbal ZIP a překopíruj soubory
+Přetáhni obsah `jbc-patch-v4/` do složky `jablonec-app`, potvrď přepsání.
 
-1. **Zastav server**: v terminálu `Ctrl + C`
-2. **Rozbal** `jbc-patch-v3.zip`
-3. **Překopíruj obsah** do složky `jablonec-app` (přepíše staré soubory,
-   přidá nové). Nejsnadnější: přetáhni vše ze `jbc-patch-v3/` do
-   `jablonec-app/` a potvrď přepsání.
-
----
-
-## 🗄️ KROK 2: Nastav PostgreSQL databázi
-
-**Tohle je nutné!** SQLite už nefunguje – potřebuješ Postgres.
-
-### Varianta A: Render (pro produkci i dev) – DOPORUČUJI
-
-Přečti si `DEPLOY.md` v patchi, je tam celý návod. Kratší verze:
-
-1. Jdi na **https://dashboard.render.com** → přihlas se
-2. **+ New** → **PostgreSQL** → vyplň:
-   - Name: `jbc-events-db`
-   - Database: `jbc_events`
-   - Region: **Frankfurt**
-   - Plan: **Free**
-3. Klikni **Create Database**, počkej 30 s
-4. Zkopíruj **"External Database URL"** z detailu DB
-
-### Varianta B: Lokální Postgres přes Docker (jen pro dev)
-
-Pokud máš Docker nainstalovaný:
-```bash
-docker run -d --name jbc-postgres -e POSTGRES_PASSWORD=devpass -p 5432:5432 postgres
-```
-
-Connection string pak je:
-```
-postgresql://postgres:devpass@localhost:5432/postgres
-```
-
----
-
-## 🔐 KROK 3: Vytvoř `.env` soubor
-
-Ve složce `jablonec-app` vytvoř soubor `.env` (v editoru, ne ve Windows Explorer
-– kvůli příponě):
-
-```
-DATABASE_URL="postgresql://tvůj_string_z_kroku_2"
-```
-
-> 💡 Tip pro Windows: v terminálu spusť `echo DATABASE_URL="..." > .env`
-
----
-
-## 📥 KROK 4: Nainstaluj nové balíčky (není nutné, ale neškodí)
-
-```bash
-npm install
-```
-
----
-
-## 🌱 KROK 5: Vytvoř tabulky v DB a nahraj data
-
-```bash
-npx prisma db push
-npm run db:seed
-```
-
-- `db push` vytvoří tabulky podle `schema.prisma`
-- `db:seed` naplní databázi uživateli, akcemi, odznaky, výzvami a ukázkovými
-  komentáři
-
----
-
-## ▶️ KROK 6: Spusť aplikaci
-
+### 2. Lokálně vyzkoušej
 ```bash
 npm run dev
 ```
 
-Otevři **http://localhost:3000**.
+Otevři **http://localhost:3000**. Protože máš v prohlížeči starý stav
+(čekiny, lajky od Terezy), **vymaž localStorage**:
 
----
+- Otevři DevTools (F12)
+- Záložka **Application** (Chrome) nebo **Storage** (Firefox)
+- Vlevo **Local Storage** → `http://localhost:3000` → pravým tlačítkem **Clear**
+- Obnov stránku (F5)
 
-## 🧪 Jak otestovat, že to funguje
+Teď bys měl vidět onboarding.
 
-- **Odečítání bodů:** jdi na `/rewards`, klikni na levnou odměnu ("Nálepky
-  1200 b."), potvrď. Zůstatek bodů v hero banneru by měl klesnout o 1200.
-- **Real komentáře:** jdi na detail akce (např. Derby FK Jablonec), napiš
-  komentář, odešli. **Obnov stránku** (F5). Komentář tam pořád je. To znamená,
-  že se uložil do databáze, ne do prohlížeče.
-- **Historie:** jdi na `/profile` → záložka "Historie". Akce seřazené od
-  nejnovější s plnými daty včetně roku.
-- **Mobil:** otevři stránku v prohlížeči, stiskni **F12**, klikni na ikonu
-  telefonu/tabletu (DevTools) a zvol **iPhone 14 Pro** nebo **Pixel 7**. Projdi
-  všechny sekce – layout by měl být vertikální a přehledný.
+### 3. Nasaď na Render
+Ve složce `jablonec-app`:
+```bash
+git add .
+git commit -m "Per-device profiles + avatars"
+git push
+```
 
----
+Render automaticky detekuje push a během ~3 minut nasadí novou verzi.
 
-## 🌍 KROK 7 (volitelný): Deploy na veřejnou URL
+### 4. Testuj na produkci
+Otevři `https://jbc-events.onrender.com` **v incognito oknu** – jako nový
+uživatel dostaneš onboarding. Vyplň jiné jméno. Napiš komentář.
 
-Až budeš spokojený, přečti `DEPLOY.md` a za 10 minut máš `https://jbc-events.onrender.com`.
-Stačí `git push` a Render deploy sám.
+Pak otevři normální okno a uvidíš komentář od tebe (Tereza) i od nového
+uživatele z incognito okna. 🎉
 
----
+## ⚠️ Poznámka k existujícím datům
 
-## ❓ Problémy?
+V databázi na Renderu pořád leží "Tereza Nováková" a pár mock přátel ze seedu.
+Nevadí to – pouze se objeví jako autor starých komentářů. Pokud chceš úplně
+čistou DB, spusť lokálně proti produkční DB:
 
-**`Error: Environment variable not found: DATABASE_URL`**
-→ Nemáš `.env` soubor, nebo ho máš s chybným jménem (třeba `.env.txt` na Windows).
+```bash
+npx tsx prisma/seed.ts
+```
 
-**`Error: P1001: Can't reach database server`**
-→ Špatný connection string, nebo databáze ještě nenastartovala (u Renderu chvilku trvá).
-
-**Komentář se nepřidá, Loader se točí navždycky**
-→ Otevři DevTools (F12) → záložka Console. Zkontroluj error. Pravděpodobně
-DB není připojená nebo seed neproběhl.
-
-**Bílá obrazovka / Cannot find module '@prisma/client'**
-→ Spusť `npx prisma generate` a pak znovu `npm run dev`.
+Nebo si upravím seed tak, aby ty mock uživatele nevytvářel. Stačí říct.
