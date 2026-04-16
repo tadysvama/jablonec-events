@@ -1,0 +1,245 @@
+// Prisma schéma – PostgreSQL pro produkci (Render, Neon, Railway)
+// Pro lokální vývoj můžeš použít Docker Postgres nebo cloud DB
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// -------------------- UŽIVATEL --------------------
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  username      String   @unique
+  name          String
+  avatarUrl     String?
+  bio           String?
+  birthYear     Int?
+  gender        String?
+  city          String?
+  interests     String   @default("[]")
+  privacyMode   String   @default("friends")
+  theme         String   @default("system")
+
+  // Gamifikace
+  totalPoints   Int      @default(0)
+  currentStreak Int      @default(0) // TÝDNŮ, ne dní
+  longestStreak Int      @default(0)
+  lastActiveAt  DateTime?
+  streakFreezes Int      @default(2)
+  currentLeague String   @default("bronze")
+  leaguePoints  Int      @default(0)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  checkins         Checkin[]
+  hostedEvents     Event[]        @relation("HostedEvents")
+  sentRequests     Friendship[]   @relation("Requester")
+  receivedRequests Friendship[]   @relation("Receiver")
+  comments         Comment[]
+  likes            Like[]
+  photos           EventPhoto[]
+  userBadges       UserBadge[]
+  userChallenges   UserChallenge[]
+  invitesSent      Invitation[]   @relation("Inviter")
+  invitesReceived  Invitation[]   @relation("Invitee")
+  rewardsClaimed   UserReward[]
+}
+
+// -------------------- AKCE --------------------
+model Event {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  category    String
+  coverImage  String?
+  location    String
+  address     String
+  latitude    Float?
+  longitude   Float?
+  startsAt    DateTime
+  endsAt      DateTime?
+  capacity    Int?
+  price       Int      @default(0)
+
+  basePoints  Int      @default(50)
+  sizeTier    String   @default("medium")
+  qrCode      String   @unique @default(cuid())
+
+  hostId      String?
+  host        User?    @relation("HostedEvents", fields: [hostId], references: [id])
+
+  externalId  String?  @unique
+  externalUrl String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  checkins    Checkin[]
+  comments    Comment[]
+  likes       Like[]
+  photos      EventPhoto[]
+  invitations Invitation[]
+}
+
+// -------------------- CHECKIN --------------------
+model Checkin {
+  id         String   @id @default(cuid())
+  userId     String
+  eventId    String
+  status     String   @default("interested")
+  pointsEarned Int    @default(0)
+  attendedAt DateTime?
+  createdAt  DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventId])
+  @@index([userId])
+  @@index([eventId])
+}
+
+// -------------------- PŘÁTELSTVÍ --------------------
+model Friendship {
+  id          String   @id @default(cuid())
+  requesterId String
+  receiverId  String
+  status      String   @default("pending")
+  createdAt   DateTime @default(now())
+
+  requester User @relation("Requester", fields: [requesterId], references: [id], onDelete: Cascade)
+  receiver  User @relation("Receiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@unique([requesterId, receiverId])
+}
+
+// -------------------- KOMENTÁŘE --------------------
+model Comment {
+  id        String   @id @default(cuid())
+  userId    String
+  eventId   String
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@index([userId])
+}
+
+model Like {
+  id        String   @id @default(cuid())
+  userId    String
+  eventId   String
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventId])
+}
+
+model EventPhoto {
+  id        String   @id @default(cuid())
+  userId    String
+  eventId   String
+  url       String
+  caption   String?
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+// -------------------- ODZNAKY --------------------
+model Badge {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  description String
+  icon        String
+  tier        String   @default("bronze")
+  category    String
+
+  userBadges  UserBadge[]
+}
+
+model UserBadge {
+  id        String   @id @default(cuid())
+  userId    String
+  badgeId   String
+  earnedAt  DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId])
+}
+
+// -------------------- VÝZVY --------------------
+model Challenge {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  icon        String
+  targetType  String
+  targetValue Int
+  categoryFilter String?
+  rewardPoints Int    @default(100)
+  rewardBadgeId String?
+  startsAt    DateTime
+  endsAt      DateTime
+
+  userChallenges UserChallenge[]
+}
+
+model UserChallenge {
+  id          String   @id @default(cuid())
+  userId      String
+  challengeId String
+  progress    Int      @default(0)
+  completed   Boolean  @default(false)
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  challenge Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, challengeId])
+}
+
+// -------------------- POZVÁNKY --------------------
+model Invitation {
+  id         String   @id @default(cuid())
+  inviterId  String
+  inviteeId  String
+  eventId    String
+  accepted   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  inviter User  @relation("Inviter", fields: [inviterId], references: [id], onDelete: Cascade)
+  invitee User  @relation("Invitee", fields: [inviteeId], references: [id], onDelete: Cascade)
+  event   Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([inviterId, inviteeId, eventId])
+}
+
+// -------------------- ODMĚNY --------------------
+model UserReward {
+  id         String   @id @default(cuid())
+  userId     String
+  rewardSlug String // mapuje na MOCK_REWARDS
+  cost       Int
+  claimedAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
