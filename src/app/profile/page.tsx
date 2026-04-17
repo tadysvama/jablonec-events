@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
-  Flame, Zap, Trophy, MapPin, Settings, Share2, Edit3, Lock, Bell, Moon, Calendar, Trash2,
+  Flame, Zap, Trophy, MapPin, Settings, Share2, Edit3, Lock, Bell, Moon, Calendar, Trash2, Users, ChevronRight,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { MOCK_BADGES } from '@/data/users';
@@ -49,6 +50,7 @@ export default function ProfilePage() {
   const router = useRouter();
   const profile = useStore((s) => s.profile);
   const earnedPoints = useStore((s) => s.earnedPoints);
+  const currentStreak = useStore((s) => s.currentStreak);
   const checkins = useStore((s) => s.checkins);
   const claimedRewards = useStore((s) => s.claimedRewards);
   const reset = useStore((s) => s.reset);
@@ -64,11 +66,15 @@ export default function ProfilePage() {
     .map((e) => ({ ...e, attendedAt: new Date().toISOString() }))
     .sort((a, b) => new Date(b.attendedAt).getTime() - new Date(a.attendedAt).getTime());
 
+  // Pro prototyp: ukaž 3 odznaky jako "získané" (první 3 z mocku)
+  const earnedBadgeCount = 3;
+
   const stats = {
-    totalPoints: Math.max(0, earnedPoints),
-    eventsAttended: attendedEventIds.length,
+    totalPoints: earnedPoints,
+    eventsAttended: attendedEventIds.length + 5, // 5 startovních pro demo
     interests: profile.interests.length,
     rewardsClaimed: claimedRewards.size,
+    badgesEarned: earnedBadgeCount,
   };
 
   const handleLogout = () => {
@@ -81,7 +87,6 @@ export default function ProfilePage() {
   return (
     <>
       <div className="max-w-4xl mx-auto px-4 md:px-6 py-4 md:py-6 pb-28 md:pb-10">
-        {/* Profile header */}
         <div className="relative overflow-hidden rounded-2xl md:rounded-3xl mb-5 md:mb-6">
           <div className="bg-gradient-to-br from-brand-600 via-brand-500 to-accent-500 p-5 md:p-8 text-white">
             <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 rounded-full blur-3xl translate-x-1/2 -translate-y-1/2" />
@@ -119,7 +124,6 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Statistiky */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 mb-5 md:mb-6">
           <div className="card p-3 md:p-4">
             <div className="flex items-center gap-1.5 text-[10px] md:text-xs text-ink-muted uppercase tracking-wider mb-1">
@@ -133,8 +137,8 @@ export default function ProfilePage() {
             <div className="flex items-center gap-1.5 text-[10px] md:text-xs text-ink-muted uppercase tracking-wider mb-1">
               <Flame className="w-3 h-3 text-flame-500" /> Streak
             </div>
-            <div className="text-xl md:text-2xl font-display font-bold">🔥 0</div>
-            <div className="text-[10px] md:text-xs text-ink-muted">týdnů · začátečník</div>
+            <div className="text-xl md:text-2xl font-display font-bold">🔥 {currentStreak}</div>
+            <div className="text-[10px] md:text-xs text-ink-muted">týdnů</div>
           </div>
           <div className="card p-3 md:p-4">
             <div className="text-[10px] md:text-xs text-ink-muted uppercase tracking-wider mb-1">
@@ -146,9 +150,24 @@ export default function ProfilePage() {
             <div className="flex items-center gap-1.5 text-[10px] md:text-xs text-ink-muted uppercase tracking-wider mb-1">
               <Trophy className="w-3 h-3 text-amber-500" /> Odznaků
             </div>
-            <div className="text-xl md:text-2xl font-display font-bold">0/{MOCK_BADGES.length}</div>
+            <div className="text-xl md:text-2xl font-display font-bold">{stats.badgesEarned}/{MOCK_BADGES.length}</div>
           </div>
         </div>
+
+        {/* Rychlý odkaz na Přátele – dostupné na mobilu (nav 5 pozic neudrží vše) */}
+        <Link
+          href="/friends"
+          className="card p-3 md:p-4 mb-5 md:mb-6 flex items-center gap-3 hover:border-brand-400 md:hidden"
+        >
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-accent-500 flex items-center justify-center flex-shrink-0">
+            <Users className="w-5 h-5 text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-sm">Přátelé</div>
+            <div className="text-xs text-ink-muted">Zobrazit přátele a najít nové</div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-ink-subtle flex-shrink-0" />
+        </Link>
 
         <div className="flex gap-1 p-1 bg-surface-muted rounded-full w-fit mb-5 overflow-x-auto max-w-full">
           {[
@@ -207,39 +226,38 @@ export default function ProfilePage() {
                 <Edit3 className="w-3 h-3" /> Změnit zájmy
               </button>
             </div>
-
-            {stats.eventsAttended === 0 && (
-              <div className="card p-4 md:p-5 border-dashed text-center">
-                <div className="text-3xl mb-2">🎯</div>
-                <div className="font-semibold mb-1">Ještě jsi nenavštívil(a) žádnou akci</div>
-                <div className="text-sm text-ink-muted">
-                  Projdi si akce, přidej se a na místě naskenuj QR kód – získáš body a odznaky.
-                </div>
-              </div>
-            )}
           </div>
         )}
 
         {tab === 'badges' && (
-          <div>
-            <div className="card p-4 md:p-5 border-dashed text-center mb-4">
-              <div className="text-3xl mb-2">🔒</div>
-              <div className="font-semibold mb-1">Zatím žádné odznaky</div>
-              <div className="text-sm text-ink-muted">
-                Plň výzvy a navštěvuj akce, abys je odemykal(a).
+          <div className="space-y-5 md:space-y-6">
+            <div>
+              <h3 className="text-xs md:text-sm font-semibold text-ink-muted uppercase tracking-wider mb-3">
+                Získané · {earnedBadgeCount}
+              </h3>
+              <div className="grid grid-cols-3 md:grid-cols-4 gap-2 md:gap-3">
+                {MOCK_BADGES.slice(0, earnedBadgeCount).map((b) => (
+                  <div key={b.id} className="card p-3 md:p-4 text-center hover:scale-105 transition-transform">
+                    <div className="text-3xl md:text-4xl mb-2">{b.icon}</div>
+                    <div className="text-xs md:text-sm font-semibold leading-tight">{b.name}</div>
+                    <div className="text-[10px] md:text-xs text-ink-muted capitalize mt-1">{b.tier}</div>
+                  </div>
+                ))}
               </div>
             </div>
-            <h3 className="text-xs md:text-sm font-semibold text-ink-muted uppercase tracking-wider mb-3">
-              Možné odznaky · {MOCK_BADGES.length}
-            </h3>
-            <div className="grid grid-cols-3 md:grid-cols-4 gap-2 md:gap-3">
-              {MOCK_BADGES.map((b) => (
-                <div key={b.id} className="card p-3 md:p-4 text-center opacity-50">
-                  <div className="text-3xl md:text-4xl mb-2 grayscale">🔒</div>
-                  <div className="text-xs md:text-sm font-semibold leading-tight">{b.name}</div>
-                  <div className="text-[10px] md:text-xs text-ink-muted capitalize mt-1">{b.tier}</div>
-                </div>
-              ))}
+            <div>
+              <h3 className="text-xs md:text-sm font-semibold text-ink-muted uppercase tracking-wider mb-3">
+                Zamčené · {MOCK_BADGES.length - earnedBadgeCount}
+              </h3>
+              <div className="grid grid-cols-3 md:grid-cols-4 gap-2 md:gap-3">
+                {MOCK_BADGES.slice(earnedBadgeCount).map((b) => (
+                  <div key={b.id} className="card p-3 md:p-4 text-center opacity-50">
+                    <div className="text-3xl md:text-4xl mb-2 grayscale">🔒</div>
+                    <div className="text-xs md:text-sm font-semibold leading-tight">{b.name}</div>
+                    <div className="text-[10px] md:text-xs text-ink-muted capitalize mt-1">{b.tier}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}
@@ -249,7 +267,7 @@ export default function ProfilePage() {
             <div className="flex items-center gap-2 text-xs md:text-sm text-ink-muted mb-3">
               <Calendar className="w-4 h-4" />
               {history.length === 0
-                ? 'Zatím žádné navštívené akce'
+                ? 'Zatím žádné navštívené akce na tomto zařízení'
                 : `Seřazeno od nejnovější · ${history.length} akcí`}
             </div>
             {history.length === 0 ? (
@@ -300,6 +318,16 @@ export default function ProfilePage() {
 
         {tab === 'settings' && (
           <div className="card divide-y divide-border">
+            <Link
+              href="/friends"
+              className="w-full flex items-center gap-3 p-3 md:p-4 hover:bg-surface-muted transition-colors text-left"
+            >
+              <Users className="w-4 h-4 md:w-5 md:h-5 text-ink-muted flex-shrink-0" />
+              <div className="flex-1">
+                <div className="font-medium text-sm">Přátelé</div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-ink-subtle" />
+            </Link>
             <SettingsRow icon={Lock} label="Režim soukromí" value="Jen přátelé" />
             <SettingsRow icon={Bell} label="Upozornění" value="Zapnuto" />
             <SettingsRow icon={Moon} label="Motiv" value="Systémový" />
@@ -316,7 +344,7 @@ export default function ProfilePage() {
                 </div>
               </div>
             </button>
-            <div className="p-4 text-ink-subtle text-xs">Verze 0.4.0 · Prototyp</div>
+            <div className="p-4 text-ink-subtle text-xs">Verze 0.5.1 · Prototyp</div>
           </div>
         )}
       </div>

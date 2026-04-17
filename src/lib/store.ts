@@ -4,43 +4,45 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { CheckinStatus, EventCategory } from './types';
 
-// Profil uživatele stažený na tomto zařízení
 export interface LocalUserProfile {
-  id: string; // persistentní ID tohoto zařízení
+  id: string;
   name: string;
   username: string;
-  ageGroup: string; // "15-17" | "18-25" | "26-35" | "36-45" | "46-60" | "60+"
-  gender: string; // "female" | "male" | "other" | "prefer_not_to_say"
+  ageGroup: string;
+  gender: string;
   city: string;
-  interests: EventCategory[]; // max 3
+  interests: EventCategory[];
   createdAt: string;
 }
 
+// Startovací hodnoty pro prototyp – aby profil nevypadal prázdně
+// (při vývoji produktu by to byly 0)
+const STARTER_POINTS = 500;
+const STARTER_STREAK = 3;
+
 interface UserStore {
-  // Onboarding
   isOnboarded: boolean;
   profile: LocalUserProfile | null;
   completeOnboarding: (profile: Omit<LocalUserProfile, 'id' | 'createdAt'>) => void;
 
-  // Akce
   checkins: Record<string, CheckinStatus>;
   setCheckin: (eventId: string, status: CheckinStatus) => void;
   removeCheckin: (eventId: string) => void;
 
-  // Lajky
   likes: Set<string>;
   toggleLike: (eventId: string) => void;
 
-  // Body (naběháno na tomto zařízení)
+  // Body – startovní hodnota + to, co nasbíráš během session
   earnedPoints: number;
   addPoints: (p: number) => void;
   spendPoints: (p: number) => boolean;
 
-  // Odměny
+  // Streak v týdnech – pro prototyp statická, v produkci by se počítala z checkinů
+  currentStreak: number;
+
   claimedRewards: Set<string>;
   claimReward: (rewardId: string, cost: number) => boolean;
 
-  // Toast
   lastToast: { id: string; title: string; body?: string; icon?: string } | null;
   showToast: (toast: { title: string; body?: string; icon?: string }) => void;
   clearToast: () => void;
@@ -48,7 +50,6 @@ interface UserStore {
   reset: () => void;
 }
 
-// Pomocná funkce pro generování unikátního ID zařízení
 function generateDeviceId(): string {
   return (
     'usr_' +
@@ -70,6 +71,11 @@ export const useStore = create<UserStore>()(
           ...data,
         };
         set({ profile, isOnboarded: true });
+
+        // Pokud je to první onboarding, přidej startovní bonus
+        if (!existing) {
+          set({ earnedPoints: STARTER_POINTS, currentStreak: STARTER_STREAK });
+        }
       },
 
       checkins: {},
@@ -91,17 +97,20 @@ export const useStore = create<UserStore>()(
           return { likes: next };
         }),
 
-      earnedPoints: 0,
+      earnedPoints: STARTER_POINTS,
       addPoints: (p) => set((s) => ({ earnedPoints: s.earnedPoints + p })),
       spendPoints: (p) => {
         set((s) => ({ earnedPoints: s.earnedPoints - p }));
         return true;
       },
 
+      currentStreak: STARTER_STREAK,
+
       claimedRewards: new Set(),
       claimReward: (rewardId, cost) => {
         const { claimedRewards, earnedPoints } = get();
         if (claimedRewards.has(rewardId)) return false;
+        if (earnedPoints < cost) return false; // nedostatek bodů
         const next = new Set(claimedRewards);
         next.add(rewardId);
         set({
@@ -122,7 +131,8 @@ export const useStore = create<UserStore>()(
           profile: null,
           checkins: {},
           likes: new Set(),
-          earnedPoints: 0,
+          earnedPoints: STARTER_POINTS,
+          currentStreak: STARTER_STREAK,
           claimedRewards: new Set(),
         }),
     }),
@@ -135,6 +145,7 @@ export const useStore = create<UserStore>()(
           checkins: state.checkins,
           likes: Array.from(state.likes),
           earnedPoints: state.earnedPoints,
+          currentStreak: state.currentStreak,
           claimedRewards: Array.from(state.claimedRewards),
         }) as any,
       onRehydrateStorage: () => (state) => {

@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { Zap, Gift, Lock, Check, Info, TrendingUp } from 'lucide-react';
 import { MOCK_REWARDS, TIER_META, RewardTier, Reward } from '@/data/rewards';
-import { CURRENT_USER } from '@/data/users';
 import { useStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
 
@@ -11,13 +10,13 @@ export default function RewardsPage() {
   const [tier, setTier] = useState<RewardTier | 'all'>('all');
   const [detailReward, setDetailReward] = useState<Reward | null>(null);
 
+  // Body čte ze store – stejná hodnota jako v profilu
   const earnedPoints = useStore((s) => s.earnedPoints);
   const claimedRewards = useStore((s) => s.claimedRewards);
   const claimReward = useStore((s) => s.claimReward);
   const showToast = useStore((s) => s.showToast);
 
-  // Skutečné body uživatele = baseline + změny během session (může být záporné = utracené)
-  const totalPoints = CURRENT_USER.totalPoints + earnedPoints;
+  const totalPoints = earnedPoints;
 
   const rewards = tier === 'all' ? MOCK_REWARDS : MOCK_REWARDS.filter((r) => r.tier === tier);
 
@@ -60,7 +59,6 @@ export default function RewardsPage() {
         </p>
       </div>
 
-      {/* Hero – moje body a cíl */}
       <div className="relative overflow-hidden rounded-2xl md:rounded-3xl bg-gradient-to-br from-brand-600 via-brand-500 to-accent-500 p-5 md:p-8 text-white shadow-xl shadow-brand-500/20 mb-5 md:mb-6">
         <div className="absolute top-0 right-0 w-48 md:w-64 h-48 md:h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
 
@@ -96,7 +94,6 @@ export default function RewardsPage() {
         </div>
       </div>
 
-      {/* Filtry tierů – horizontální scroll na mobilu */}
       <div className="flex gap-2 overflow-x-auto pb-2 mb-5 -mx-4 px-4 md:mx-0 md:px-0">
         <button
           onClick={() => setTier('all')}
@@ -138,7 +135,6 @@ export default function RewardsPage() {
         </div>
       )}
 
-      {/* Grid odměn */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
         {rewards.map((r) => {
           const tierMeta = TIER_META[r.tier];

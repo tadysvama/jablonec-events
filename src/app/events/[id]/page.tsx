@@ -164,6 +164,7 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
               onClick={() => setShowInvite(true)}
               className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-white/20 backdrop-blur-md text-white hover:bg-white/30 flex items-center justify-center"
               aria-label="Sdílet"
+              title="Sdílet"
             >
               <Share2 className="w-3.5 h-3.5 md:w-4 md:h-4" />
             </button>
