@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Search, Zap, Flame, TrendingUp } from 'lucide-react';
+import { Search, Zap, Flame, TrendingUp, TrendingDown } from 'lucide-react';
 import { MOCK_EVENTS, filterEvents } from '@/data/events';
 import { CATEGORY_LABELS, EventCategory, User } from '@/lib/types';
 import { EventCard } from '@/components/events/EventCard';
@@ -20,7 +20,6 @@ export default function HomePage() {
 
   const events = useMemo(() => {
     if (sortBy === 'recommended' && profile) {
-      // Pseudo-user pro doporučovací algoritmus
       const pseudoUser: User = {
         id: profile.id,
         username: profile.username,
@@ -50,7 +49,11 @@ export default function HomePage() {
   const featured = events[0];
   const rest = events.slice(1);
 
-  if (!profile) return null; // OnboardingGate přesměruje
+  if (!profile) return null;
+
+  // Rozlišení: kladné = zisk, záporné = "utraceno"
+  const isNegative = earnedPoints < 0;
+  const displayPoints = Math.abs(earnedPoints);
 
   return (
     <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-6 pb-28 md:pb-10">
@@ -66,12 +69,21 @@ export default function HomePage() {
                 Co se děje v Jablonci
               </h1>
               <div className="flex flex-wrap items-center gap-1.5 md:gap-3 text-xs md:text-sm">
-                <div className="flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1 md:py-1.5 rounded-full bg-white/20 backdrop-blur-sm">
-                  <Zap className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                  <span className="font-semibold">
-                    {earnedPoints.toLocaleString('cs-CZ')} b.
-                  </span>
-                </div>
+                {isNegative ? (
+                  <div className="flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1 md:py-1.5 rounded-full bg-white/20 backdrop-blur-sm">
+                    <TrendingDown className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                    <span className="font-semibold">
+                      Utraceno {displayPoints.toLocaleString('cs-CZ')} b. za týden
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1 md:py-1.5 rounded-full bg-white/20 backdrop-blur-sm">
+                    <Zap className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                    <span className="font-semibold">
+                      {displayPoints.toLocaleString('cs-CZ')} b. tento týden
+                    </span>
+                  </div>
+                )}
                 <div className="hidden sm:flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1 md:py-1.5 rounded-full bg-white/20 backdrop-blur-sm">
                   <Flame className="w-3.5 h-3.5 md:w-4 md:h-4" />
                   <span className="font-semibold">0 týdnů · začátečník</span>

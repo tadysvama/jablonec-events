@@ -18,14 +18,27 @@ const fraunces = Fraunces({
   axes: ['SOFT', 'WONK'],
 });
 
+// Next.js automaticky najde /app/opengraph-image.tsx a použije ji pro všechny stránky,
+// pokud stránka nemá vlastní opengraph-image.
 export const metadata: Metadata = {
-  title: 'JBC Events – Žij Jablonec naplno',
+  metadataBase: new URL('https://jbc-events.onrender.com'),
+  title: {
+    default: 'JBC Events – Žij Jablonec naplno',
+    template: '%s | JBC Events',
+  },
   description:
     'Komunitní aplikace pro kulturní a sportovní akce v Jablonci nad Nisou. Sbírej body, buduj streaky, objevuj nová místa.',
   openGraph: {
+    type: 'website',
+    locale: 'cs_CZ',
+    title: 'JBC Events – Žij Jablonec naplno',
+    description: 'Gamifikovaný kulturní a sportovní život v Jablonci',
+    siteName: 'JBC Events',
+  },
+  twitter: {
+    card: 'summary_large_image',
     title: 'JBC Events',
     description: 'Gamifikovaný kulturní a sportovní život v Jablonci',
-    type: 'website',
   },
 };
 
