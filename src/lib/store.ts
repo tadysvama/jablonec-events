@@ -15,9 +15,28 @@ export interface LocalUserProfile {
   createdAt: string;
 }
 
-// Startovací hodnoty pro prototyp – aby profil nevypadal prázdně
-// (při vývoji produktu by to byly 0)
-const STARTER_POINTS = 500;
+// Společný streak s kamarádem
+export interface BuddyStreak {
+  id: string;
+  friendId: string; // id uživatele z MOCK_FRIENDS
+  createdAt: string;
+  currentWeeks: number; // kolik týdnů streak trvá
+  longestWeeks: number; // rekord
+  lastActiveAt: string; // ISO datum posledního "společného plnění"
+  goal?: string; // volitelný cíl, např. "2 koncerty měsíčně"
+  completedThisWeek: boolean; // už v tomto týdnu splněno?
+}
+
+// Vygeneruje náhodné body 2000-2500 končící na 5 nebo 0
+function randomStarterPoints(): number {
+  // Seznam všech čísel mezi 2000 a 2500 končících na 0 nebo 5
+  // → 2000, 2005, 2010, 2015... 2495, 2500
+  // Celkem 101 hodnot (každých 5 krok)
+  const steps = Math.floor((2500 - 2000) / 5) + 1;
+  const randomIndex = Math.floor(Math.random() * steps);
+  return 2000 + randomIndex * 5;
+}
+
 const STARTER_STREAK = 3;
 
 interface UserStore {
@@ -32,16 +51,20 @@ interface UserStore {
   likes: Set<string>;
   toggleLike: (eventId: string) => void;
 
-  // Body – startovní hodnota + to, co nasbíráš během session
   earnedPoints: number;
   addPoints: (p: number) => void;
   spendPoints: (p: number) => boolean;
 
-  // Streak v týdnech – pro prototyp statická, v produkci by se počítala z checkinů
   currentStreak: number;
 
   claimedRewards: Set<string>;
   claimReward: (rewardId: string, cost: number) => boolean;
+
+  // Společné streaky s kamarády
+  buddyStreaks: BuddyStreak[];
+  createBuddyStreak: (friendId: string, goal?: string) => BuddyStreak;
+  removeBuddyStreak: (id: string) => void;
+  completeBuddyStreakThisWeek: (id: string) => void;
 
   lastToast: { id: string; title: string; body?: string; icon?: string } | null;
   showToast: (toast: { title: string; body?: string; icon?: string }) => void;
@@ -51,11 +74,11 @@ interface UserStore {
 }
 
 function generateDeviceId(): string {
-  return (
-    'usr_' +
-    Math.random().toString(36).substring(2, 11) +
-    Date.now().toString(36)
-  );
+  return 'usr_' + Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
+}
+
+function generateStreakId(): string {
+  return 'bs_' + Math.random().toString(36).substring(2, 11);
 }
 
 export const useStore = create<UserStore>()(
@@ -72,9 +95,27 @@ export const useStore = create<UserStore>()(
         };
         set({ profile, isOnboarded: true });
 
-        // Pokud je to první onboarding, přidej startovní bonus
         if (!existing) {
-          set({ earnedPoints: STARTER_POINTS, currentStreak: STARTER_STREAK });
+          // První onboarding – nastav náhodné startovní hodnoty + 1 streak s náhodným kamarádem
+          const startingPoints = randomStarterPoints();
+
+          // Vygeneruj 1 buddy streak s prvním kamarádem z mocku (Martin Kovář)
+          const initialStreak: BuddyStreak = {
+            id: generateStreakId(),
+            friendId: 'usr_002', // Martin Kovář
+            createdAt: new Date(Date.now() - 7 * 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 týdnů zpátky
+            currentWeeks: 7,
+            longestWeeks: 7,
+            lastActiveAt: new Date().toISOString(),
+            goal: 'Alespoň 1 akce týdně',
+            completedThisWeek: true,
+          };
+
+          set({
+            earnedPoints: startingPoints,
+            currentStreak: STARTER_STREAK,
+            buddyStreaks: [initialStreak],
+          });
         }
       },
 
@@ -97,7 +138,7 @@ export const useStore = create<UserStore>()(
           return { likes: next };
         }),
 
-      earnedPoints: STARTER_POINTS,
+      earnedPoints: 0,
       addPoints: (p) => set((s) => ({ earnedPoints: s.earnedPoints + p })),
       spendPoints: (p) => {
         set((s) => ({ earnedPoints: s.earnedPoints - p }));
@@ -110,7 +151,7 @@ export const useStore = create<UserStore>()(
       claimReward: (rewardId, cost) => {
         const { claimedRewards, earnedPoints } = get();
         if (claimedRewards.has(rewardId)) return false;
-        if (earnedPoints < cost) return false; // nedostatek bodů
+        if (earnedPoints < cost) return false;
         const next = new Set(claimedRewards);
         next.add(rewardId);
         set({
@@ -119,6 +160,42 @@ export const useStore = create<UserStore>()(
         });
         return true;
       },
+
+      buddyStreaks: [],
+      createBuddyStreak: (friendId, goal) => {
+        const existing = get().buddyStreaks.find((s) => s.friendId === friendId);
+        if (existing) return existing;
+
+        const newStreak: BuddyStreak = {
+          id: generateStreakId(),
+          friendId,
+          createdAt: new Date().toISOString(),
+          currentWeeks: 0,
+          longestWeeks: 0,
+          lastActiveAt: new Date().toISOString(),
+          goal,
+          completedThisWeek: false,
+        };
+        set((s) => ({ buddyStreaks: [...s.buddyStreaks, newStreak] }));
+        return newStreak;
+      },
+      removeBuddyStreak: (id) =>
+        set((s) => ({ buddyStreaks: s.buddyStreaks.filter((bs) => bs.id !== id) })),
+      completeBuddyStreakThisWeek: (id) =>
+        set((s) => ({
+          buddyStreaks: s.buddyStreaks.map((bs) => {
+            if (bs.id !== id) return bs;
+            if (bs.completedThisWeek) return bs;
+            const newCurrent = bs.currentWeeks + 1;
+            return {
+              ...bs,
+              currentWeeks: newCurrent,
+              longestWeeks: Math.max(bs.longestWeeks, newCurrent),
+              completedThisWeek: true,
+              lastActiveAt: new Date().toISOString(),
+            };
+          }),
+        })),
 
       lastToast: null,
       showToast: (toast) =>
@@ -131,9 +208,10 @@ export const useStore = create<UserStore>()(
           profile: null,
           checkins: {},
           likes: new Set(),
-          earnedPoints: STARTER_POINTS,
+          earnedPoints: 0,
           currentStreak: STARTER_STREAK,
           claimedRewards: new Set(),
+          buddyStreaks: [],
         }),
     }),
     {
@@ -147,6 +225,7 @@ export const useStore = create<UserStore>()(
           earnedPoints: state.earnedPoints,
           currentStreak: state.currentStreak,
           claimedRewards: Array.from(state.claimedRewards),
+          buddyStreaks: state.buddyStreaks,
         }) as any,
       onRehydrateStorage: () => (state) => {
         if (state) {
@@ -154,6 +233,7 @@ export const useStore = create<UserStore>()(
           if (Array.isArray(s.likes)) s.likes = new Set(s.likes);
           if (Array.isArray(s.claimedRewards))
             s.claimedRewards = new Set(s.claimedRewards);
+          if (!Array.isArray(s.buddyStreaks)) s.buddyStreaks = [];
         }
       },
     }

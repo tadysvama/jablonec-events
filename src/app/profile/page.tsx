@@ -7,7 +7,7 @@ import {
   Flame, Zap, Trophy, MapPin, Settings, Share2, Edit3, Lock, Bell, Moon, Calendar, Trash2, Users, ChevronRight,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
-import { MOCK_BADGES } from '@/data/users';
+import { MOCK_BADGES, MOCK_FRIENDS } from '@/data/users';
 import { MOCK_EVENTS } from '@/data/events';
 import { CATEGORY_LABELS } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -53,6 +53,7 @@ export default function ProfilePage() {
   const currentStreak = useStore((s) => s.currentStreak);
   const checkins = useStore((s) => s.checkins);
   const claimedRewards = useStore((s) => s.claimedRewards);
+  const buddyStreaks = useStore((s) => s.buddyStreaks);
   const reset = useStore((s) => s.reset);
   const [tab, setTab] = useState<'overview' | 'history' | 'badges' | 'settings'>('overview');
   const [editOpen, setEditOpen] = useState(false);
@@ -66,12 +67,11 @@ export default function ProfilePage() {
     .map((e) => ({ ...e, attendedAt: new Date().toISOString() }))
     .sort((a, b) => new Date(b.attendedAt).getTime() - new Date(a.attendedAt).getTime());
 
-  // Pro prototyp: ukaž 3 odznaky jako "získané" (první 3 z mocku)
   const earnedBadgeCount = 3;
 
   const stats = {
     totalPoints: earnedPoints,
-    eventsAttended: attendedEventIds.length + 5, // 5 startovních pro demo
+    eventsAttended: attendedEventIds.length + 5,
     interests: profile.interests.length,
     rewardsClaimed: claimedRewards.size,
     badgesEarned: earnedBadgeCount,
@@ -154,7 +154,52 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Rychlý odkaz na Přátele – dostupné na mobilu (nav 5 pozic neudrží vše) */}
+        {/* Společné streaky – pokud nějaké jsou, zobraz */}
+        {buddyStreaks.length > 0 && (
+          <div className="card p-4 md:p-5 mb-5 md:mb-6 border-flame-500/30 bg-gradient-to-br from-flame-50 to-accent-50 dark:from-flame-500/5 dark:to-accent-500/5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-display font-bold flex items-center gap-2">
+                <Flame className="w-4 h-4 text-flame-500" /> Společné streaky
+              </h3>
+              <Link href="/friends" className="text-xs text-brand-600 font-semibold hover:underline">
+                Zobrazit vše →
+              </Link>
+            </div>
+            <div className="space-y-2">
+              {buddyStreaks.slice(0, 3).map((bs) => {
+                const friend = MOCK_FRIENDS.find((f) => f.id === bs.friendId);
+                if (!friend) return null;
+                return (
+                  <Link
+                    key={bs.id}
+                    href={`/friends/streak/${bs.id}`}
+                    className="flex items-center gap-3 p-2 md:p-3 rounded-xl bg-surface-elevated border border-border hover:border-flame-400 transition-colors"
+                  >
+                    <div className="flex -space-x-2 flex-shrink-0">
+                      <Avatar name={profile.name} size="sm" className="ring-2 ring-surface-elevated" />
+                      <Avatar name={friend.name} size="sm" className="ring-2 ring-surface-elevated" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-sm truncate">
+                        s {friend.name.split(' ')[0]}
+                      </div>
+                      <div className="flex items-center gap-2 text-[11px]">
+                        <span className="font-bold text-flame-600">🔥 {bs.currentWeeks}t</span>
+                        {bs.completedThisWeek ? (
+                          <span className="text-streak-600">✓ tento týden</span>
+                        ) : (
+                          <span className="text-amber-600">⏳ neplněno</span>
+                        )}
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-ink-subtle flex-shrink-0" />
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <Link
           href="/friends"
           className="card p-3 md:p-4 mb-5 md:mb-6 flex items-center gap-3 hover:border-brand-400 md:hidden"
@@ -164,7 +209,7 @@ export default function ProfilePage() {
           </div>
           <div className="flex-1 min-w-0">
             <div className="font-semibold text-sm">Přátelé</div>
-            <div className="text-xs text-ink-muted">Zobrazit přátele a najít nové</div>
+            <div className="text-xs text-ink-muted">Zobrazit přátele a streaky</div>
           </div>
           <ChevronRight className="w-5 h-5 text-ink-subtle flex-shrink-0" />
         </Link>
@@ -344,7 +389,7 @@ export default function ProfilePage() {
                 </div>
               </div>
             </button>
-            <div className="p-4 text-ink-subtle text-xs">Verze 0.5.1 · Prototyp</div>
+            <div className="p-4 text-ink-subtle text-xs">Verze 0.6.0 · Prototyp</div>
           </div>
         )}
       </div>
