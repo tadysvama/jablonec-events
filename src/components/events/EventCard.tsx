@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { MapPin, Users, Heart, Zap, Trophy } from 'lucide-react';
+import { MapPin, Users, Heart, Zap, Trophy, Calendar } from 'lucide-react';
 import { Event, CATEGORY_LABELS } from '@/lib/types';
 import { formatDate, formatNumber, formatPrice, cn, getRelativeTime, getDayOfWeek } from '@/lib/utils';
 import { useStore } from '@/lib/store';
@@ -20,6 +20,7 @@ export function EventCard({ event, variant = 'default' }: EventCardProps) {
   const checkinStatus = checkins[event.id];
   const cat = CATEGORY_LABELS[event.category];
 
+  // Compact varianta – malá horizontální karta do seznamu
   if (variant === 'compact') {
     return (
       <Link href={`/events/${event.id}`} className="card p-3 flex gap-3 items-center group hover:border-brand-300">
@@ -42,17 +43,121 @@ export function EventCard({ event, variant = 'default' }: EventCardProps) {
     );
   }
 
-  const isFeatured = variant === 'featured';
+  // Featured varianta – přes 2 sloupce a 2 řádky v gridu
+  // Řešení: obrázek vyplní CELOU kartu, meta jsou absolutně nad ním
+  if (variant === 'featured') {
+    return (
+      <Link
+        href={`/events/${event.id}`}
+        className="group relative card overflow-hidden hover:-translate-y-1 hover:shadow-xl transition-all duration-300 animate-fade-in block md:col-span-2 md:row-span-2 min-h-[400px] md:min-h-[600px]"
+      >
+        {/* Obrázek na plnou výšku karty */}
+        <img
+          src={event.coverImage}
+          alt={event.title}
+          className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          loading="lazy"
+        />
+        {/* Overlay gradient – aby byl text čitelný */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-black/10" />
 
+        {/* Horní chipy */}
+        <div className="absolute top-3 md:top-4 left-3 md:left-4 flex gap-2 flex-wrap max-w-[calc(100%-80px)]">
+          <span className={cn('inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs md:text-sm font-semibold text-white backdrop-blur-md bg-gradient-to-r', cat.color)}>
+            <span>{cat.emoji}</span>
+            {cat.cs}
+          </span>
+          {event.sizeTier === 'mega' && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold text-white bg-accent-500/90 backdrop-blur-md">
+              <Trophy className="w-3 h-3" />
+              Mega
+            </span>
+          )}
+        </div>
+
+        {/* Tlačítko lajk */}
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleLike(event.id);
+          }}
+          className={cn(
+            'absolute top-3 md:top-4 right-3 md:right-4 w-10 h-10 rounded-full backdrop-blur-md flex items-center justify-center transition-all',
+            isLiked ? 'bg-accent-500 text-white scale-110' : 'bg-white/20 text-white hover:bg-white/30'
+          )}
+          aria-label="Lajk"
+        >
+          <Heart className={cn('w-5 h-5', isLiked && 'fill-white')} />
+        </button>
+
+        {/* Status badge když uživatel jde */}
+        {checkinStatus === 'going' && (
+          <div className="absolute top-16 right-3 md:right-4 px-3 py-1.5 rounded-full bg-streak-500 text-white text-xs font-bold flex items-center gap-1 animate-bounce-in shadow-lg">
+            ✓ Jdu
+          </div>
+        )}
+        {checkinStatus === 'interested' && (
+          <div className="absolute top-16 right-3 md:right-4 px-3 py-1.5 rounded-full bg-brand-600 text-white text-xs font-bold shadow-lg">
+            ⭐ Zájem
+          </div>
+        )}
+
+        {/* Spodní obsah – vyplní spodní část karty */}
+        <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 text-white">
+          <div className="flex items-center gap-2 text-xs md:text-sm font-medium opacity-90 mb-2 md:mb-3 uppercase tracking-wider">
+            <Calendar className="w-3.5 h-3.5 md:w-4 md:h-4" />
+            {getDayOfWeek(event.startsAt)} · {formatDate(event.startsAt, { withTime: true, short: true })}
+          </div>
+
+          <h3 className="font-display font-bold leading-tight mb-3 md:mb-4 text-2xl md:text-4xl line-clamp-2">
+            {event.title}
+          </h3>
+
+          {event.description && (
+            <p className="text-xs md:text-sm opacity-80 mb-3 md:mb-4 line-clamp-2 leading-relaxed hidden md:block">
+              {event.description}
+            </p>
+          )}
+
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-3 md:gap-4 min-w-0">
+              <div className="flex items-center gap-1.5 text-sm">
+                <MapPin className="w-4 h-4 flex-shrink-0 opacity-80" />
+                <span className="font-medium truncate">{event.location}</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
+              <div className="flex items-center gap-1 text-xs md:text-sm">
+                <Users className="w-3.5 h-3.5 md:w-4 md:h-4 opacity-80" />
+                <span className="font-semibold">{formatNumber(event.attendeeCount)}</span>
+              </div>
+              <div className="flex items-center gap-1 text-xs md:text-sm">
+                <Heart className="w-3.5 h-3.5 md:w-4 md:h-4 opacity-80" />
+                <span className="font-semibold">{formatNumber(event.likeCount)}</span>
+              </div>
+              <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/20 backdrop-blur-md">
+                <Zap className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                <span className="text-xs md:text-sm font-bold">+{event.basePoints}</span>
+              </div>
+              <span className={cn('text-sm md:text-base font-bold', event.price === 0 ? 'text-streak-300' : 'text-white')}>
+                {formatPrice(event.price)}
+              </span>
+            </div>
+          </div>
+        </div>
+      </Link>
+    );
+  }
+
+  // Default varianta – standardní karta
   return (
     <Link
       href={`/events/${event.id}`}
-      className={cn(
-        'group relative card overflow-hidden hover:-translate-y-1 hover:shadow-xl transition-all duration-300 animate-fade-in block',
-        isFeatured && 'md:col-span-2 md:row-span-2'
-      )}
+      className="group relative card overflow-hidden hover:-translate-y-1 hover:shadow-xl transition-all duration-300 animate-fade-in block"
     >
-      <div className={cn('relative overflow-hidden', isFeatured ? 'aspect-[16/10]' : 'aspect-[16/11]')}>
+      <div className="relative aspect-[16/11] overflow-hidden">
         <img
           src={event.coverImage}
           alt={event.title}
@@ -95,7 +200,7 @@ export function EventCard({ event, variant = 'default' }: EventCardProps) {
               <div className="text-[10px] md:text-xs font-medium opacity-80 uppercase tracking-wider mb-1">
                 {getDayOfWeek(event.startsAt)} · {formatDate(event.startsAt, { withTime: true, short: true })}
               </div>
-              <h3 className={cn('font-display font-bold leading-tight line-clamp-2', isFeatured ? 'text-xl md:text-3xl' : 'text-base md:text-lg')}>
+              <h3 className="font-display font-bold leading-tight line-clamp-2 text-base md:text-lg">
                 {event.title}
               </h3>
             </div>
